@@ -18,8 +18,8 @@ def _main_add_tool(a: int, b: int) -> int:
     """
     return a + b
 
-def _generate_plot_image(a: int, b: int, total: int) -> str:
-    """Create a simple bar plot and return base64 PNG data."""
+def _generate_plot_image(a: int, b: int, total: int) -> tuple[str, str]:
+    """Create a simple bar plot and return base64 PNG data and data URI."""
     labels = ["First", "Second", "Sum"]
     values = [a, b, total]
 
@@ -32,7 +32,11 @@ def _generate_plot_image(a: int, b: int, total: int) -> str:
     buffer = io.BytesIO()
     fig.savefig(buffer, format="png", bbox_inches="tight")
     plt.close(fig)
-    return base64.b64encode(buffer.getvalue()).decode("ascii")
+    
+    png_base64 = base64.b64encode(buffer.getvalue()).decode("ascii")
+    png_data_uri = f"data:image/png;base64,{png_base64}"
+    
+    return png_base64, png_data_uri
 
 def _generate_csv_data_uri(a: int, b: int, total: int) -> str:
     """Return CSV content encoded as a data URI for download."""
@@ -46,19 +50,43 @@ def _generate_csv_data_uri(a: int, b: int, total: int) -> str:
 @mcp.tool()
 def add(a: int, b: int) -> list[dict[str, Any]]:
     """
-    Add two numbers together
+    Add two numbers together and generate visualization.
+    
+    This tool returns:
+    1. A text result with the sum
+    2. A PNG bar chart visualization (MUST be displayed inline in the conversation)
+    3. A CSV file with the data (MUST provide download link to user)
+    
+    Always display the image and provide download links for both the PNG and CSV files.
     """
     total = _main_add_tool(a, b)
-    plot_data = _generate_plot_image(a, b, total)
+    plot_base64, plot_uri = _generate_plot_image(a, b, total)
     csv_uri = _generate_csv_data_uri(a, b, total)
 
     return [
-        {"type": "text", "text": f"{a} + {b} = {total}"},
+        {
+            "type": "text",
+            "text": (
+                f"Result: {a} + {b} = {total}\n\n"
+                f"📊 A bar chart visualization is included below - display it inline.\n"
+                f"📁 Files available:\n"
+                f"  • addition.png - Bar chart visualization (provide download link)\n"
+                f"  • addition.csv - Data in CSV format (provide download link)"
+            ),
+        },
         {
             "type": "image",
             "image": {
                 "mimeType": "image/png",
-                "data": plot_data,
+                "data": plot_base64,
+            },
+        },
+        {
+            "type": "resource",
+            "resource": {
+                "uri": plot_uri,
+                "mimeType": "image/png",
+                "name": "addition.png",
             },
         },
         {
